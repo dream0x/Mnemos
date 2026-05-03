@@ -2,7 +2,7 @@
 # Hermes Oracle — one-shot installer for a fresh Hetzner Ubuntu 24.04 VPS.
 #
 # Run as root via the Hetzner Cloud Console:
-#   curl -fsSL https://raw.githubusercontent.com/dream0x/Hermes-Tarot/main/scripts/install_hetzner.sh -o /tmp/install.sh && bash /tmp/install.sh
+#   curl -fsSL https://raw.githubusercontent.com/dream0x/Mnemos/main/scripts/install_hetzner.sh -o /tmp/install.sh && bash /tmp/install.sh
 #
 # After this script finishes, you must:
 #   1. Edit /opt/hermes-tarot/.env  (paste secrets)   ->  nano /opt/hermes-tarot/.env
@@ -10,7 +10,7 @@
 #   3. Watch logs:      journalctl -u hermes-tarot -f
 set -euo pipefail
 
-REPO_URL="https://github.com/dream0x/Hermes-Tarot.git"
+REPO_URL="https://github.com/dream0x/Mnemos.git"
 INSTALL_DIR="/opt/hermes-tarot"
 SERVICE_USER="hermes"
 PYTHON_BIN="python3.12"   # Ubuntu 24.04 default

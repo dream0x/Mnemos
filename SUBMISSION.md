@@ -4,10 +4,10 @@
 
 ## ✅ Status (live)
 
-- **Code:** https://github.com/dream0x/Hermes-Tarot — public, MIT
+- **Code:** https://github.com/dream0x/Mnemos — public, MIT
 - **Live bot:** [@hermeskimi_oracle_bot](https://t.me/hermeskimi_oracle_bot) on Telegram
 - **NFT contract (Base Sepolia):** `0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16` — [Basescan](https://sepolia.basescan.org/address/0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16)
-- **Custom on-chain card viewer:** https://dream0x.github.io/Hermes-Tarot/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1
+- **Custom on-chain card viewer:** https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1
 - **Hosting:** Hetzner CX22 (€4.5/mo), systemd auto-restart, ufw firewall
 
 ## Demo recording — must-show beats
@@ -16,7 +16,7 @@ In any order, but all four must appear in the 60–90s video:
 
 1. **A reading happens** — type a question in @hermeskimi_oracle_bot, three FLUX cards appear as a media-group, Kimi reading scrolls below.
 2. **Memory is real** — pull a SECOND reading and show that the oracle references the first ("Last week the Fool came to you…"). This is the "Powered by Kimi K2.6 · 256K context" moment — burn that caption on screen.
-3. **Mint on-chain** — tap the `🔮 Mint` button, see the OpenSea-style custom viewer load the actual card from Base Sepolia + IPFS. (Use this URL: https://dream0x.github.io/Hermes-Tarot/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=N)
+3. **Mint on-chain** — tap the `🔮 Mint` button, see the OpenSea-style custom viewer load the actual card from Base Sepolia + IPFS. (Use this URL: https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=N)
 4. **Schedule daily** — tap `📅 Daily at 9 AM UTC` to show Hermes' natural scheduling power.
 
 **On-screen credits required:** `@NousResearch` `@Kimi_Moonshot`, plus the GitHub URL on the end card.
@@ -29,7 +29,7 @@ Required in the actual tweet text or media:
 - [ ] Tags `@NousResearch`
 - [ ] Tags `@Kimi_Moonshot`
 - [ ] Demo video attached (vertical 9:16 if you can)
-- [ ] GitHub URL: `github.com/dream0x/Hermes-Tarot`
+- [ ] GitHub URL: `github.com/dream0x/Mnemos`
 - [ ] Some hook that names what's special. Concrete pitches you can riff on:
   - "An AI tarot reader that remembers every card it has ever pulled for you. Built on @NousResearch's Hermes Agent + @Kimi_Moonshot's K2.6 256K context. Mints your hero card on Base Sepolia."
   - "I taught Hermes Agent to read tarot. It paints the cards itself, writes the reading with Kimi K2.6, and mints your card on-chain."
@@ -54,7 +54,7 @@ with 256K-context memory of every prior reading, and mints the hero card on
 Base Sepolia. Live bot: @hermeskimi_oracle_bot.
 
 Tweet: <YOUR_TWEET_URL>
-GitHub: https://github.com/dream0x/Hermes-Tarot
+GitHub: https://github.com/dream0x/Mnemos
 ```
 
 ### Long (for the writeup track judges)
@@ -80,8 +80,8 @@ Why it's a Kimi-Track submission:
 
 Live bot: https://t.me/hermeskimi_oracle_bot
 Tweet: <YOUR_TWEET_URL>
-GitHub (MIT): https://github.com/dream0x/Hermes-Tarot
-Card viewer: https://dream0x.github.io/Hermes-Tarot/
+GitHub (MIT): https://github.com/dream0x/Mnemos
+Card viewer: https://dream0x.github.io/Mnemos/
 Contract: 0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16 (Base Sepolia)
 ```
 

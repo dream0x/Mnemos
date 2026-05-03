@@ -5,7 +5,7 @@
 A divination companion built as a [Hermes Agent](https://hermes-agent.nousresearch.com/) skill. Mnemos pulls tarot spreads, paints the cards in a unified deck style with FLUX, and answers your question through them with **Kimi K2.6's 256K context** — using the entire history of readings it's ever given you. The hero card of each reading can be minted on **Base Sepolia** as an ERC-721 keepsake, viewable through a custom on-chain viewer.
 
 > **Try it live:** [@hermeskimi_oracle_bot](https://t.me/hermeskimi_oracle_bot) on Telegram
-> **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Hermes-Tarot/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
+> **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
 >
 > Public users get 3 readings/day (anti-abuse). Owner has unlimited use and minting.
 
@@ -106,8 +106,8 @@ Critical files:
 
 ### Install
 ```bash
-git clone https://github.com/dream0x/Hermes-Tarot.git
-cd Hermes-Tarot
+git clone https://github.com/dream0x/Mnemos.git
+cd Mnemos
 cp .env.example .env       # then fill in real keys — see .env.example
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -129,7 +129,7 @@ python bot.py
 ### Production (Hetzner VPS, what we run)
 ```bash
 # As root, on a fresh Ubuntu 24.04 VPS:
-curl -fsSL https://raw.githubusercontent.com/dream0x/Hermes-Tarot/main/scripts/install_hetzner.sh -o /tmp/install.sh && bash /tmp/install.sh
+curl -fsSL https://raw.githubusercontent.com/dream0x/Mnemos/main/scripts/install_hetzner.sh -o /tmp/install.sh && bash /tmp/install.sh
 # Then nano /opt/hermes-tarot/.env, paste secrets, and:
 systemctl start hermes-tarot
 ```

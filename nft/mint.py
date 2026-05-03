@@ -203,7 +203,7 @@ def build_metadata(card: dict[str, Any], question: str, interpretation_excerpt: 
             f"(Moonshot AI). For reflection, not prescription."
         ),
         "image": f"ipfs://{image_cid}",
-        "external_url": "https://github.com/dream0x/Hermes-Tarot",
+        "external_url": "https://github.com/dream0x/Mnemos",
         "attributes": [
             {"trait_type": "Card", "value": card["name"]},
             {"trait_type": "Arcana", "value": card.get("arcana", "minor")},
