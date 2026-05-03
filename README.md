@@ -4,7 +4,11 @@
 
 Built for the [**Hermes Agent Creative Hackathon**](https://hermes-agent.nousresearch.com/) by [Nous Research](https://nousresearch.com/) × [Kimi (Moonshot AI)](https://www.kimi.com/), May 2026.
 
-![demo](docs/demo.gif) <!-- placeholder; will be replaced with the submission video -->
+> **Try it live:** [@hermeskimi_oracle_bot](https://t.me/hermeskimi_oracle_bot) on Telegram · **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Hermes-Tarot/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
+>
+> Public users get 3 readings/day (anti-abuse). Owner has unlimited use and minting.
+
+![demo](docs/demo.gif) <!-- replaced with the submission video before final -->
 
 ---
 
@@ -95,12 +99,33 @@ python -m hermes_oracle.nft.mint --dry-run        # Pinata + tx simulation
 
 ---
 
+## What this demonstrates
+
+| Hermes Agent strength | How Hermes Oracle uses it |
+|---|---|
+| Persistent memory | Every reading is appended to a per-user JSONL; every new reading injects the full history into Kimi's 256K context — the oracle *literally remembers every card you've ever pulled* |
+| Scheduled tasks (natural-language cron) | One tap on `📅 Daily at 9 AM UTC` registers a JobQueue cron — your sun-sign horoscope arrives every morning, forever |
+| Multi-platform | The same `oracle.py` skill module runs through any Hermes transport — Telegram is just the first; Discord/Slack/WhatsApp would need ~30 min of config, no code changes |
+| Skills that grow | Add reversed-card art, new spreads, custom decks — the skill model lets the agent *learn what you ask for* and adapt without retraining |
+
+## Powered by Kimi K2.6
+
+The **Kimi Track** rewards genuine use of Kimi K2.6, not a thin wrapper. Hermes Oracle uses K2.6 specifically for:
+
+- **256K context window** — the entire reading history fits, every time. Older models would have to summarize, losing texture.
+- **Long-horizon coherence** — the oracle voice stays in character across many turns, with stable archetypes and tone.
+- **Multilingual** — auto-detects user input language and translates in voice (we lock to English output by design).
+- **`thinking: disabled`** — for warm, immediate prose without chain-of-thought leakage.
+
 ## Roadmap (post-hackathon v0.2)
-- Live **x402** paid premium readings (autonomous USDC microtransactions)
-- Autonomous mint per reading (every spread auto-mints as a private NFT)
+- Live **x402** paid premium readings (autonomous USDC microtransactions per spread)
+- Autonomous mint per reading (every spread auto-mints as a private NFT keepsake)
 - Discord & WhatsApp deployments (Hermes makes this ~30 min of config)
 - Voice replies via TTS
-- Mobile-friendly WebApp inside Telegram
+- Mobile-friendly Telegram WebApp for richer card flips & spread choices
+- More spreads (Celtic Cross, Year-Ahead, Career Cross)
+- Astrology natal chart rendering (skyfield is already in deps)
+- Optional opt-in “predictions tracked” — agent revisits old readings and asks if they came true
 
 ---
 
