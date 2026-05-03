@@ -85,6 +85,10 @@ User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=$INSTALL_DIR/.env
+# Keep solcx (and any other ~/.cache user) inside the installdir, since
+# ProtectHome=read-only blocks writes to /home/hermes.
+Environment=SOLCX_BINARY_PATH=$INSTALL_DIR/.solcx
+Environment=HOME=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/.venv/bin/python -u bot.py
 Restart=on-failure
 RestartSec=5
@@ -92,7 +96,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=$INSTALL_DIR/data $INSTALL_DIR/logs $INSTALL_DIR/tarot/cache $INSTALL_DIR/nft/build
+ReadWritePaths=$INSTALL_DIR/data $INSTALL_DIR/logs $INSTALL_DIR/tarot/cache $INSTALL_DIR/nft/build $INSTALL_DIR/.solcx
 StandardOutput=journal
 StandardError=journal
 

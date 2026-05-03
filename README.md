@@ -4,7 +4,7 @@
 
 A divination companion built as a [Hermes Agent](https://hermes-agent.nousresearch.com/) skill. Mnemos pulls tarot spreads, paints the cards in a unified deck style with FLUX, and answers your question through them with **Kimi K2.6's 256K context** — using the entire history of readings it's ever given you. The hero card of each reading can be minted on **Base Sepolia** as an ERC-721 keepsake, viewable through a custom on-chain viewer.
 
-> **Try it live:** [@hermeskimi_oracle_bot](https://t.me/hermeskimi_oracle_bot) on Telegram
+> **Try it live:** [@mnemos_oracle_bot](https://t.me/mnemos_oracle_bot) on Telegram
 > **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
 >
 > Public users get 3 readings/day (anti-abuse). Owner has unlimited use and minting.

@@ -1,11 +1,11 @@
 """Mnemos — Telegram bot transport.
 
-A thin wrapper around `oracle.py`. Owns the Telegram UX (BotCommands menu,
-onboarding wizard, media-groups, inline buttons, JobQueue for daily horoscopes)
-and delegates all real work to the skill module.
-
-Run:
-    python bot.py
+A thin wrapper around `oracle.py`. Owns the Telegram UX:
+  • Persistent ReplyKeyboard with the main actions (Pull, Single, Horoscope, …)
+  • Question-asking conversations: tap "Pull" → bot asks for the question
+  • First-run onboarding wizard (sun sign + city + owner wallet)
+  • Inline buttons under each reading (Mint / Pull again / Daily horoscope)
+  • JobQueue cron for daily horoscopes
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InputMediaPhoto,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
     Update,
 )
 from telegram.constants import ChatAction, ParseMode
@@ -54,10 +56,28 @@ log = logging.getLogger("mnemos.bot")
 BRAND = "Mnemos"
 TAGLINE = "the oracle that remembers every card it's ever pulled for you"
 
+# ----- Reply keyboard labels (these MUST be exact — they are also the Regex patterns) -----
+BTN_PULL = "🔮 Pull cards"
+BTN_SINGLE = "🃏 Single card"
+BTN_HOROSCOPE = "☀️ Horoscope"
+BTN_HISTORY = "🕯️ History"
+BTN_PROFILE = "👤 Profile"
+BTN_HELP = "❓ Help"
+
+MAIN_KB = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton(BTN_PULL), KeyboardButton(BTN_SINGLE)],
+        [KeyboardButton(BTN_HOROSCOPE), KeyboardButton(BTN_HISTORY)],
+        [KeyboardButton(BTN_PROFILE), KeyboardButton(BTN_HELP)],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+    input_field_placeholder="Tap a button or type your question…",
+)
+
 WELCOME_RETURNING = (
     f"🪞 *Welcome back to {BRAND}.*\n\n"
-    "Send a question — anything sitting on your chest — and the cards will answer.\n\n"
-    "Tap the menu (☰) for all commands, or type /help."
+    "Tap a button below — or just send a question and the cards will answer."
 )
 
 WELCOME_NEW = (
@@ -71,23 +91,24 @@ HELP_TEXT = f"""\
 🪞 *{BRAND}* — full command guide
 
 *Reading the cards*
-  /pull — three-card spread (past · present · future). Add your question after the command, e.g. `/pull will this project ship?`
-  /single — one-card reading for a tight question.
-  Or just *send a message* with no command — we'll treat it as a question and pull a 3-card spread.
+  🔮 *Pull cards* — three-card spread (past · present · future). Bot will ask for your question.
+  🃏 *Single card* — one-card reading for a tight question.
+  Or just *send any message* — we'll treat it as a question and pull a 3-card spread immediately.
 
 *Astrology*
-  /horoscope — today's horoscope for your saved sun sign. `/horoscope leo` overrides the saved sign.
+  ☀️ *Horoscope* — today's horoscope for your sun sign. If you haven't set one, the bot will ask.
 
 *Your context*
-  /profile — view profile (sun sign, birth place, wallet for NFTs).
-        `/profile sign aries` · `/profile dob 1995-04-12` · `/profile place "Kyiv, Ukraine"` · `/profile wallet 0x…`
-  /history — your last 5 readings.
-  /start — re-runs the onboarding wizard if you ever want to redo it.
+  👤 *Profile* — view profile (sun sign, birth place, wallet for NFTs).
+  🕯️ *History* — your last 5 readings.
 
 *Buttons under each reading*
   🔮 *Mint hero card on-chain* — pin the first card's image to IPFS and mint it as an ERC-721 on Base Sepolia. Owner-gated by default.
   📅 *Daily at 9 AM UTC* — register a recurring horoscope at 09:00 UTC.
   🪞 *Pull again* — re-runs the same question with a fresh draw.
+
+*Slash-command shortcuts*
+  /pull <question> · /single <question> · /horoscope <sign> · /profile · /history · /start
 
 *How {BRAND} actually thinks*
   Every reading is appended to a JSONL file scoped to your Telegram ID. The next reading injects up to 30 prior readings into Kimi K2.6's 256K context — so the oracle literally references where you've been.
@@ -98,19 +119,20 @@ HELP_TEXT = f"""\
 _For reflection, not prescription._
 """
 
-# Top-level slash command menu shown in Telegram's "/" popover.
+# Top-level "/" popover shown when typing a slash. Reply keyboard is the primary UX.
 COMMANDS_MENU = [
-    BotCommand("pull", "Pull a 3-card spread (add your question)"),
-    BotCommand("single", "Pull one card (add your question)"),
+    BotCommand("pull", "Pull a 3-card spread (asks your question)"),
+    BotCommand("single", "Pull one card (asks your question)"),
     BotCommand("horoscope", "Today's horoscope for your sun sign"),
     BotCommand("history", "Your last 5 readings"),
     BotCommand("profile", "View / edit your profile"),
     BotCommand("help", "All commands & how Mnemos thinks"),
     BotCommand("start", "Welcome / restart onboarding"),
+    BotCommand("cancel", "Cancel any open prompt"),
 ]
 
 # ----------------------------------------------------------------------
-# Static data (zodiac signs, top-10 cities)
+# Static data
 # ----------------------------------------------------------------------
 
 ZODIAC_SIGNS: list[tuple[str, str]] = [
@@ -119,14 +141,17 @@ ZODIAC_SIGNS: list[tuple[str, str]] = [
     ("♎", "Libra"), ("♏", "Scorpio"), ("♐", "Sagittarius"),
     ("♑", "Capricorn"), ("♒", "Aquarius"), ("♓", "Pisces"),
 ]
+SIGN_NAMES = {name for _, name in ZODIAC_SIGNS}
 
 TOP_CITIES: list[str] = [
     "New York", "London", "Los Angeles", "Tokyo", "Paris",
     "Berlin", "Dubai", "Singapore", "Mumbai", "São Paulo",
 ]
 
-# Conversation states for onboarding
-(ONB_SIGN, ONB_CITY, ONB_CITY_CUSTOM, ONB_WALLET) = range(4)
+# Conversation states
+ONB_SIGN, ONB_CITY, ONB_CITY_CUSTOM, ONB_WALLET = range(4)
+ASK_PULL_Q, ASK_SINGLE_Q, ASK_HOROSCOPE_SIGN = range(10, 13)
+
 
 # ----------------------------------------------------------------------
 # Helpers
@@ -145,7 +170,6 @@ def _user_label(update: Update) -> str:
 
 
 def _gate(user_id: int) -> tuple[bool, str | None]:
-    """Return (allowed, refusal_message_or_none)."""
     decision = check_can_read(user_id)
     if not decision.allowed:
         return False, decision.user_message
@@ -153,14 +177,11 @@ def _gate(user_id: int) -> tuple[bool, str | None]:
 
 
 def _is_new_user(user_id: int) -> bool:
-    """First-time? Profile exists only if user has interacted before."""
     p = Profile.load(user_id)
     return not (p.sun_sign or p.display_name or p.birth_place)
 
 
 def _owner_default_wallet() -> str:
-    """The deployer wallet derived from DEPLOYER_PRIVATE_KEY. Used as the default
-    NFT recipient for the owner so they don't have to set it manually."""
     if not cfg.deployer_private_key:
         return ""
     try:
@@ -182,18 +203,18 @@ def _reading_keyboard(user_id: int, reading_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def _signs_keyboard() -> InlineKeyboardMarkup:
+def _signs_inline_keyboard(prefix: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for i in range(0, 12, 3):
         row = [
-            InlineKeyboardButton(f"{em} {name}", callback_data=f"onb:sign:{name}")
+            InlineKeyboardButton(f"{em} {name}", callback_data=f"{prefix}:{name}")
             for em, name in ZODIAC_SIGNS[i:i + 3]
         ]
         rows.append(row)
     return InlineKeyboardMarkup(rows)
 
 
-def _cities_keyboard() -> InlineKeyboardMarkup:
+def _cities_inline_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for i in range(0, 10, 2):
         row = [
@@ -206,7 +227,6 @@ def _cities_keyboard() -> InlineKeyboardMarkup:
 
 
 def _wallet_keyboard() -> InlineKeyboardMarkup:
-    """Owner-only step: pick wallet for NFT recipients."""
     rows: list[list[InlineKeyboardButton]] = []
     default = _owner_default_wallet()
     if default:
@@ -220,7 +240,7 @@ def _wallet_keyboard() -> InlineKeyboardMarkup:
 
 
 # ----------------------------------------------------------------------
-# Onboarding wizard (ConversationHandler)
+# Onboarding wizard (fires only on first /start)
 # ----------------------------------------------------------------------
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -228,11 +248,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     log.info("/start from %s (new=%s)", _user_label(update), _is_new_user(user_id))
 
     if not _is_new_user(user_id):
-        # Returning user — short welcome, end any active conversation
-        await update.message.reply_text(WELCOME_RETURNING, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(
+            WELCOME_RETURNING, parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB
+        )
         return ConversationHandler.END
 
-    # Initialise profile with display_name from Telegram so we know they've started
     profile = Profile.load(user_id)
     profile.display_name = update.effective_user.full_name or f"user-{user_id}"
     profile.save()
@@ -241,7 +261,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         "*Step 1 of 3.* What's your sun sign?",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_signs_keyboard(),
+        reply_markup=_signs_inline_keyboard("onb:sign"),
     )
     return ONB_SIGN
 
@@ -261,7 +281,7 @@ async def onb_pick_sign(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         chat_id=query.message.chat_id,
         text="*Step 2 of 3.* Where are you based? This grounds your readings in time.",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_cities_keyboard(),
+        reply_markup=_cities_inline_keyboard(),
     )
     return ONB_CITY
 
@@ -308,8 +328,8 @@ async def _onb_next_after_city(update: Update, ctx: ContextTypes.DEFAULT_TYPE, u
             reply_markup=_wallet_keyboard(),
         )
         return ONB_WALLET
-    # Non-owners skip wallet (they can't mint anyway)
-    await ctx.bot.send_message(chat_id, _onb_done_text(user_id), parse_mode=ParseMode.MARKDOWN)
+    await ctx.bot.send_message(chat_id, _onb_done_text(user_id),
+                                parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
     return ConversationHandler.END
 
 
@@ -326,18 +346,17 @@ async def onb_pick_wallet(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
         profile.save()
         await query.edit_message_text(f"🪙 Wallet saved: `{addr}`", parse_mode=ParseMode.MARKDOWN)
         await ctx.bot.send_message(query.message.chat_id, _onb_done_text(user_id),
-                                    parse_mode=ParseMode.MARKDOWN)
+                                    parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
         return ConversationHandler.END
     if payload == "_skip":
         await query.edit_message_text("⏭  Wallet skipped — set it later with `/profile wallet 0x…`",
                                        parse_mode=ParseMode.MARKDOWN)
         await ctx.bot.send_message(query.message.chat_id, _onb_done_text(user_id),
-                                    parse_mode=ParseMode.MARKDOWN)
+                                    parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
         return ConversationHandler.END
-    # _custom
     await query.edit_message_text("✏️  Paste your wallet address (must start with 0x):",
                                    parse_mode=ParseMode.MARKDOWN)
-    return ONB_WALLET  # next message is text
+    return ONB_WALLET
 
 
 async def onb_wallet_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -350,7 +369,8 @@ async def onb_wallet_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
     profile.wallet_address = text
     profile.save()
     await update.message.reply_text(f"🪙 Wallet saved: `{text}`", parse_mode=ParseMode.MARKDOWN)
-    await update.message.reply_text(_onb_done_text(user_id), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(_onb_done_text(user_id),
+                                     parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
     return ConversationHandler.END
 
 
@@ -366,139 +386,20 @@ def _onb_done_text(user_id: int) -> str:
     summary = "  ·  ".join(bits) if bits else "(no profile yet)"
     return (
         f"✅ *Profile set:* {summary}\n\n"
-        "Now ask the cards anything. Try sending a question like:\n"
-        "  _“What does the next month want from me?”_\n\n"
-        "Or use the menu (☰ next to the message field)."
+        "Tap *🔮 Pull cards* to begin. The bot will ask your question."
     )
 
 
 async def onb_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Onboarding cancelled. Use /start to begin again.")
+    await update.message.reply_text(
+        "Cancelled. Tap a button or type /start to begin again.",
+        reply_markup=MAIN_KB,
+    )
     return ConversationHandler.END
 
 
 # ----------------------------------------------------------------------
-# Regular commands
-# ----------------------------------------------------------------------
-
-async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(HELP_TEXT, parse_mode=ParseMode.MARKDOWN)
-
-
-async def cmd_pull(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    question = " ".join(ctx.args) if ctx.args else ""
-    await _do_reading(update, ctx, question or "Speak to me about this moment.", spread="three_card")
-
-
-async def cmd_single(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    question = " ".join(ctx.args) if ctx.args else "What does this moment ask of me?"
-    await _do_reading(update, ctx, question, spread="single")
-
-
-async def cmd_horoscope(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = _user_id(update)
-    sign = (ctx.args[0] if ctx.args else "").strip().capitalize()
-    profile = Profile.load(user_id)
-    sign = sign or (profile.sun_sign or "")
-    if not sign:
-        await update.message.reply_text(
-            "Tell me your sun sign first: `/horoscope leo` (or run /start to set it).",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-        return
-    ok, refusal = _gate(user_id)
-    if not ok:
-        await update.message.reply_text(refusal or "Not now.", parse_mode=ParseMode.MARKDOWN)
-        return
-    await ctx.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
-    try:
-        text = await asyncio.to_thread(oracle_mod.daily_horoscope, sign, user_id)
-    except Exception as e:  # noqa: BLE001
-        log.exception("horoscope failed")
-        await update.message.reply_text(f"The Oracle stumbled: `{e}`", parse_mode=ParseMode.MARKDOWN)
-        return
-    commit_read(user_id)
-    await update.message.reply_text(f"☀️ *{sign} — today*\n\n{text}", parse_mode=ParseMode.MARKDOWN)
-
-
-async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = _user_id(update)
-    profile = Profile.load(user_id)
-    if not ctx.args:
-        body = "\n".join(f"{k}: {v}" for k, v in asdict(profile).items() if v) or "(empty)"
-        await update.message.reply_text(
-            f"*Your profile:*\n```\n{body}\n```\n"
-            "Set fields:\n"
-            "  `/profile sign leo`\n"
-            "  `/profile dob 1995-04-12`\n"
-            "  `/profile place \"Kyiv, Ukraine\"`\n"
-            "  `/profile wallet 0xabc…`",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-        return
-    field, _, value = " ".join(ctx.args).partition(" ")
-    field = field.lower().strip()
-    value = value.strip().strip('"').strip("'")
-    mapping = {
-        "sign": "sun_sign", "dob": "dob", "place": "birth_place",
-        "time": "birth_time", "name": "display_name",
-        "wallet": "wallet_address", "tone": "tone_preference",
-    }
-    attr = mapping.get(field)
-    if not attr:
-        await update.message.reply_text(f"Unknown field `{field}`.", parse_mode=ParseMode.MARKDOWN)
-        return
-    setattr(profile, attr, value)
-    profile.save()
-    await update.message.reply_text(f"✓ {attr} = {value}", parse_mode=ParseMode.MARKDOWN)
-
-
-async def cmd_history(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = _user_id(update)
-    rs = recent_readings(user_id, limit=5)
-    if not rs:
-        await update.message.reply_text("No readings yet. Send a question to begin.")
-        return
-    lines = [f"🕯️ *Your last {len(rs)} readings:*\n"]
-    for r in rs:
-        ts = time.strftime("%Y-%m-%d", time.gmtime(r.timestamp))
-        cards = ", ".join(c["name"] for c in r.cards)
-        lines.append(f"`{ts}` — _{r.question[:60]}_\n      {cards}\n")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
-
-
-async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = _user_id(update)
-    if not cfg.is_owner(user_id):
-        return
-    g = todays_spend()
-    msg = (
-        f"*{BRAND} — status*\n"
-        f"Today's spend: ${g.spent_usd:.4f} / ${cfg.max_daily_usd_spend}\n"
-        f"Breakdown: {g.breakdown}\n"
-        f"Public enabled: {cfg.public_enabled}\n"
-        f"Public daily / lifetime: {cfg.public_daily_readings} / {cfg.public_lifetime_readings}\n"
-        f"Allowlist daily: {cfg.allowlist_daily_readings}\n"
-        f"Owner: {cfg.owner_telegram_id}\n"
-    )
-    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
-
-
-# ----------------------------------------------------------------------
-# Free-form text -> reading
-# ----------------------------------------------------------------------
-
-async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.message.text:
-        return
-    q = update.message.text.strip()
-    if q.startswith("/"):
-        return
-    await _do_reading(update, ctx, q, spread="three_card")
-
-
-# ----------------------------------------------------------------------
-# Reading flow
+# Reading flow (the actual core)
 # ----------------------------------------------------------------------
 
 THINKING = "🕯️ _Drawing the cards..._"
@@ -582,16 +483,222 @@ async def _do_reading(
 
 
 # ----------------------------------------------------------------------
-# Inline buttons (non-onboarding)
+# Question-asking conversations
+# ----------------------------------------------------------------------
+
+async def cmd_pull(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    """Three-card spread. With args -> immediate. Without -> ask the question."""
+    question = " ".join(ctx.args) if ctx.args else ""
+    if question:
+        await _do_reading(update, ctx, question, spread="three_card")
+        return ConversationHandler.END
+    return await _ask_question(update, "🔮 *Three-card spread.*", ASK_PULL_Q)
+
+
+async def cmd_single(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    question = " ".join(ctx.args) if ctx.args else ""
+    if question:
+        await _do_reading(update, ctx, question, spread="single")
+        return ConversationHandler.END
+    return await _ask_question(update, "🃏 *Single card.*", ASK_SINGLE_Q)
+
+
+async def btn_pull(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    return await _ask_question(update, "🔮 *Three-card spread.*", ASK_PULL_Q)
+
+
+async def btn_single(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    return await _ask_question(update, "🃏 *Single card.*", ASK_SINGLE_Q)
+
+
+async def _ask_question(update: Update, prefix: str, state: int) -> int:
+    await update.message.reply_text(
+        f"{prefix}\n\nWhat question are you bringing to the cards?\n"
+        "_Type it freely. /cancel to abort._",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return state
+
+
+async def receive_pull_q(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = (update.message.text or "").strip()
+    if not q or len(q) < 3:
+        await update.message.reply_text("That's a bit short. Type a real question, or /cancel:")
+        return ASK_PULL_Q
+    await _do_reading(update, ctx, q, spread="three_card")
+    return ConversationHandler.END
+
+
+async def receive_single_q(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = (update.message.text or "").strip()
+    if not q or len(q) < 3:
+        await update.message.reply_text("That's a bit short. Type a real question, or /cancel:")
+        return ASK_SINGLE_Q
+    await _do_reading(update, ctx, q, spread="single")
+    return ConversationHandler.END
+
+
+# Horoscope conversation
+async def cmd_horoscope(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = _user_id(update)
+    sign_arg = (ctx.args[0] if ctx.args else "").strip().capitalize()
+    if sign_arg in SIGN_NAMES:
+        await _send_horoscope(update, ctx, user_id, sign_arg)
+        return ConversationHandler.END
+    profile = Profile.load(user_id)
+    if profile.sun_sign in SIGN_NAMES:
+        await _send_horoscope(update, ctx, user_id, profile.sun_sign)
+        return ConversationHandler.END
+    await update.message.reply_text(
+        "☀️ *Horoscope.*\n\nWhich sign?",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=_signs_inline_keyboard("hor:sign"),
+    )
+    return ASK_HOROSCOPE_SIGN
+
+
+async def btn_horoscope(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    return await cmd_horoscope(update, ctx)
+
+
+async def receive_horoscope_sign(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    sign = query.data.split(":", 2)[2]
+    await query.edit_message_text(f"☀️ *{sign}*", parse_mode=ParseMode.MARKDOWN)
+    # Save it for next time
+    profile = Profile.load(user_id)
+    if not profile.sun_sign:
+        profile.sun_sign = sign
+        profile.save()
+    fake_msg = type("M", (), {
+        "reply_text": lambda *a, **k: ctx.bot.send_message(query.message.chat_id, *a, **k),
+        "chat_id": query.message.chat_id,
+    })
+    fake_update = type("U", (), {
+        "message": fake_msg,
+        "effective_chat": query.message.chat,
+        "effective_user": query.from_user,
+    })
+    await _send_horoscope(fake_update, ctx, user_id, sign)
+    return ConversationHandler.END
+
+
+async def _send_horoscope(update, ctx, user_id: int, sign: str) -> None:
+    chat_id = update.effective_chat.id
+    ok, refusal = _gate(user_id)
+    if not ok:
+        await ctx.bot.send_message(chat_id, refusal or "Not now.", parse_mode=ParseMode.MARKDOWN)
+        return
+    await ctx.bot.send_chat_action(chat_id, ChatAction.TYPING)
+    try:
+        text = await asyncio.to_thread(oracle_mod.daily_horoscope, sign, user_id)
+    except Exception as e:  # noqa: BLE001
+        log.exception("horoscope failed")
+        await ctx.bot.send_message(chat_id, f"The Oracle stumbled: `{e}`", parse_mode=ParseMode.MARKDOWN)
+        return
+    commit_read(user_id)
+    await ctx.bot.send_message(chat_id, f"☀️ *{sign} — today*\n\n{text}", parse_mode=ParseMode.MARKDOWN)
+
+
+# ----------------------------------------------------------------------
+# Simple commands (no conversation)
+# ----------------------------------------------------------------------
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(HELP_TEXT, parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
+
+
+async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = _user_id(update)
+    profile = Profile.load(user_id)
+    if not ctx.args:
+        body = "\n".join(f"{k}: {v}" for k, v in asdict(profile).items() if v) or "(empty)"
+        await update.message.reply_text(
+            f"*Your profile:*\n```\n{body}\n```\n"
+            "Set fields:\n"
+            "  `/profile sign leo`\n"
+            "  `/profile dob 1995-04-12`\n"
+            "  `/profile place \"Kyiv, Ukraine\"`\n"
+            "  `/profile wallet 0xabc…`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+    field, _, value = " ".join(ctx.args).partition(" ")
+    field = field.lower().strip()
+    value = value.strip().strip('"').strip("'")
+    mapping = {
+        "sign": "sun_sign", "dob": "dob", "place": "birth_place",
+        "time": "birth_time", "name": "display_name",
+        "wallet": "wallet_address", "tone": "tone_preference",
+    }
+    attr = mapping.get(field)
+    if not attr:
+        await update.message.reply_text(f"Unknown field `{field}`.", parse_mode=ParseMode.MARKDOWN)
+        return
+    setattr(profile, attr, value)
+    profile.save()
+    await update.message.reply_text(f"✓ {attr} = {value}", parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_history(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = _user_id(update)
+    rs = recent_readings(user_id, limit=5)
+    if not rs:
+        await update.message.reply_text("No readings yet. Send a question to begin.")
+        return
+    lines = [f"🕯️ *Your last {len(rs)} readings:*\n"]
+    for r in rs:
+        ts = time.strftime("%Y-%m-%d", time.gmtime(r.timestamp))
+        cards = ", ".join(c["name"] for c in r.cards)
+        lines.append(f"`{ts}` — _{r.question[:60]}_\n      {cards}\n")
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = _user_id(update)
+    if not cfg.is_owner(user_id):
+        return
+    g = todays_spend()
+    msg = (
+        f"*{BRAND} — status*\n"
+        f"Today's spend: ${g.spent_usd:.4f} / ${cfg.max_daily_usd_spend}\n"
+        f"Breakdown: {g.breakdown}\n"
+        f"Public enabled: {cfg.public_enabled}\n"
+        f"Public daily / lifetime: {cfg.public_daily_readings} / {cfg.public_lifetime_readings}\n"
+        f"Allowlist daily: {cfg.allowlist_daily_readings}\n"
+        f"Owner: {cfg.owner_telegram_id}\n"
+    )
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
+
+# ----------------------------------------------------------------------
+# Free-form text (fallback) -> immediate reading
+# ----------------------------------------------------------------------
+
+async def on_free_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """A user message NOT inside any conversation and NOT matching a button.
+    Treat it as a question for a 3-card spread (the original UX)."""
+    if not update.message or not update.message.text:
+        return
+    q = update.message.text.strip()
+    if q.startswith("/"):
+        return
+    await _do_reading(update, ctx, q, spread="three_card")
+
+
+# ----------------------------------------------------------------------
+# Inline buttons under readings
 # ----------------------------------------------------------------------
 
 async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if not query or not query.data:
         return
-    # Onboarding callbacks are handled by ConversationHandler; ignore them here.
-    if query.data.startswith("onb:"):
-        return
+    if query.data.startswith(("onb:", "hor:sign:")):
+        return  # handled by ConversationHandlers
+
     await query.answer()
     user_id = query.from_user.id
     data = query.data
@@ -663,8 +770,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                         parse_mode=ParseMode.MARKDOWN)
             return
 
-        # Owner-friendly: if they didn't set a wallet during onboarding, fall back
-        # to the deployer wallet so the mint always works in demo.
         profile = Profile.load(user_id)
         if not profile.wallet_address:
             default = _owner_default_wallet()
@@ -686,7 +791,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                         parse_mode=ParseMode.MARKDOWN)
             return
 
-        # Pull the card name for a friendlier confirmation
         reading = find_reading(user_id, reading_id)
         card_name = reading.cards[int(idx)]["name"] if reading and reading.cards else "card"
 
@@ -727,7 +831,6 @@ async def _job_daily_horoscope(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ----------------------------------------------------------------------
 
 async def _post_init(app: Application) -> None:
-    """Set the BotCommands menu once the bot starts."""
     try:
         await app.bot.set_my_commands(COMMANDS_MENU, scope=BotCommandScopeAllPrivateChats())
         await app.bot.set_my_short_description(
@@ -740,7 +843,7 @@ async def _post_init(app: Application) -> None:
             "Creative Hackathon (Nous Research × Kimi).\n\n"
             "github.com/dream0x/Mnemos"
         )
-        log.info("BotCommands menu + descriptions registered")
+        log.info("BotCommands + descriptions registered")
     except Exception:  # noqa: BLE001
         log.exception("failed to register BotCommands menu")
 
@@ -750,7 +853,7 @@ def build_app() -> Application:
         raise SystemExit("TELEGRAM_BOT_TOKEN is not set")
     app = ApplicationBuilder().token(cfg.telegram_bot_token).post_init(_post_init).build()
 
-    # Onboarding wizard — entered only via /start when user is new
+    # 1) Onboarding — only fires for first-time /start
     onboarding = ConversationHandler(
         entry_points=[CommandHandler("start", cmd_start)],
         states={
@@ -767,15 +870,59 @@ def build_app() -> Application:
     )
     app.add_handler(onboarding)
 
+    # 2) Pull conversation: button or /pull (no args) -> ask question
+    pull_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("pull", cmd_pull),
+            MessageHandler(filters.Regex(f"^{BTN_PULL}$"), btn_pull),
+        ],
+        states={ASK_PULL_Q: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_pull_q)]},
+        fallbacks=[CommandHandler("cancel", onb_cancel)],
+        allow_reentry=True,
+    )
+    app.add_handler(pull_conv)
+
+    # 3) Single conversation
+    single_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("single", cmd_single),
+            MessageHandler(filters.Regex(f"^{BTN_SINGLE}$"), btn_single),
+        ],
+        states={ASK_SINGLE_Q: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_single_q)]},
+        fallbacks=[CommandHandler("cancel", onb_cancel)],
+        allow_reentry=True,
+    )
+    app.add_handler(single_conv)
+
+    # 4) Horoscope conversation
+    horoscope_conv = ConversationHandler(
+        entry_points=[
+            CommandHandler("horoscope", cmd_horoscope),
+            MessageHandler(filters.Regex(f"^{BTN_HOROSCOPE}$"), btn_horoscope),
+        ],
+        states={
+            ASK_HOROSCOPE_SIGN: [CallbackQueryHandler(receive_horoscope_sign, pattern=r"^hor:sign:")]
+        },
+        fallbacks=[CommandHandler("cancel", onb_cancel)],
+        allow_reentry=True,
+    )
+    app.add_handler(horoscope_conv)
+
+    # 5) Plain commands & button shortcuts
     app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CommandHandler("pull", cmd_pull))
-    app.add_handler(CommandHandler("single", cmd_single))
-    app.add_handler(CommandHandler("horoscope", cmd_horoscope))
+    app.add_handler(MessageHandler(filters.Regex(f"^{BTN_HELP}$"), cmd_help))
     app.add_handler(CommandHandler("profile", cmd_profile))
+    app.add_handler(MessageHandler(filters.Regex(f"^{BTN_PROFILE}$"), cmd_profile))
     app.add_handler(CommandHandler("history", cmd_history))
+    app.add_handler(MessageHandler(filters.Regex(f"^{BTN_HISTORY}$"), cmd_history))
     app.add_handler(CommandHandler("status", cmd_status))
+
+    # 6) Inline-button callbacks (mint / pull_again / schedule_daily)
     app.add_handler(CallbackQueryHandler(on_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+
+    # 7) Catch-all free text -> immediate reading (the original "just send a question" UX)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_free_text))
+
     return app
 
 

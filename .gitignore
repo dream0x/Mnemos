@@ -42,6 +42,12 @@ env/
 build/
 dist/
 
+# Re-include the compiled NFT artifact (no secrets — just ABI + bytecode).
+# Shipping it means the server never has to run solcx (which writes to ~/.solcx,
+# blocked by systemd ProtectHome=read-only).
+!nft/build/
+!nft/build/OracleCard.json
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
