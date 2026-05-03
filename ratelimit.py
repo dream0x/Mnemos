@@ -1,4 +1,4 @@
-"""Per-user rate limits + global daily $ ceiling for Hermes Oracle.
+"""Per-user rate limits + global daily $ ceiling for Mnemos.
 
 Tier rules (also encoded in config.Config.tier_of):
   - owner       : unlimited everything, can mint

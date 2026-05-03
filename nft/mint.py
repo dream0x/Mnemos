@@ -195,12 +195,12 @@ def pin_json(data: dict[str, Any], name: str) -> str:
 def build_metadata(card: dict[str, Any], question: str, interpretation_excerpt: str,
                    reading_id: str, image_cid: str) -> dict[str, Any]:
     return {
-        "name": f"Hermes Oracle — {card['name']}{' (Reversed)' if card.get('reversed') else ''}",
+        "name": f"Mnemos — {card['name']}{' (Reversed)' if card.get('reversed') else ''}",
         "description": (
-            f"A card from a Hermes Oracle reading. Question: \"{question}\".\n\n"
+            f"A card from a Mnemos reading. Question: \"{question}\".\n\n"
             f"{interpretation_excerpt}\n\n"
-            f"Powered by Hermes Agent (Nous Research) and Kimi K2.6 (Moonshot AI). "
-            f"For reflection, not prescription."
+            f"Mnemos is a Hermes Agent skill (Nous Research) interpreted by Kimi K2.6 "
+            f"(Moonshot AI). For reflection, not prescription."
         ),
         "image": f"ipfs://{image_cid}",
         "external_url": "https://github.com/dream0x/Hermes-Tarot",

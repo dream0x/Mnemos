@@ -1,4 +1,4 @@
-"""Hermes Oracle — public API.
+"""Mnemos — public API.
 
 Hermes Agent (or any caller) imports this module and calls the functions
 below. Each tool returns a JSON-serializable dict so the agent can hand
@@ -25,7 +25,7 @@ from memory import (
     update_reading,
 )
 
-logger = logging.getLogger("hermes_oracle")
+logger = logging.getLogger("mnemos")
 
 SPREADS: dict[str, int] = {
     "single": 1,

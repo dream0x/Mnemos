@@ -1,4 +1,4 @@
-"""Per-user persistence for Hermes Oracle.
+"""Per-user persistence for Mnemos.
 
 Layout:
     data/{telegram_user_id}/

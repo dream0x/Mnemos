@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Hermes Oracle — On-chain Card Viewer</title>
-<meta name="description" content="View a Hermes Oracle tarot card minted on Base Sepolia. Powered by Hermes Agent and Kimi K2.6." />
-<meta property="og:title" content="Hermes Oracle — On-chain Card" />
-<meta property="og:description" content="A tarot card from a Hermes Oracle reading, minted on Base Sepolia." />
+<title>Mnemos — On-chain Card Viewer</title>
+<meta name="description" content="View a Mnemos tarot card minted on Base Sepolia. Mnemos is a Hermes Agent skill powered by Kimi K2.6." />
+<meta property="og:title" content="Mnemos — On-chain Card" />
+<meta property="og:description" content="A tarot card from a Mnemos reading, minted on Base Sepolia. Mnemos remembers every card it's ever pulled for you." />
 <style>
   :root {
     --bg: #0d0a14;
@@ -117,7 +117,7 @@
 </head>
 <body>
 <header>
-  <div class="title">🔮 Hermes Oracle</div>
+  <div class="title">🔮 Mnemos</div>
   <div class="crumbs"><span id="chainLabel">Base Sepolia</span></div>
 </header>
 <main id="root">
@@ -261,7 +261,7 @@ async function load() {
 
   if (!contract || !token) {
     root.innerHTML = "";
-    root.appendChild(el("div", { class: "empty" }, "Enter a Hermes Oracle contract address and token id to view the card."));
+    root.appendChild(el("div", { class: "empty" }, "Enter a Mnemos contract address and token id to view the card."));
     renderForm(root);
     return;
   }
@@ -284,7 +284,7 @@ async function load() {
 
     const left = el("div", { class: "card-wrap" },
       reversed ? el("div", { class: "reversed-flag" }, "Reversed") : null,
-      el("img", { src: cardImg, alt: meta.name || "Hermes Oracle card" })
+      el("img", { src: cardImg, alt: meta.name || "Mnemos card" })
     );
 
     const attrEls = (meta.attributes || []).map(a =>

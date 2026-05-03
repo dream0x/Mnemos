@@ -1,4 +1,4 @@
-# Hermes Oracle — Hackathon Submission
+# Mnemos — Hackathon Submission
 
 > Internal cheat sheet for the user. Not pushed for marketing — just keeps everything you need in one place when you record + post.
 
@@ -33,7 +33,7 @@ Required in the actual tweet text or media:
 - [ ] Some hook that names what's special. Concrete pitches you can riff on:
   - "An AI tarot reader that remembers every card it has ever pulled for you. Built on @NousResearch's Hermes Agent + @Kimi_Moonshot's K2.6 256K context. Mints your hero card on Base Sepolia."
   - "I taught Hermes Agent to read tarot. It paints the cards itself, writes the reading with Kimi K2.6, and mints your card on-chain."
-  - "What if your daily horoscope remembered every reading you ever had? Hermes Oracle: tarot + astro + on-chain keepsakes, in your DMs."
+  - "What if your daily horoscope remembered every reading you ever had? Mnemos: tarot + astro + on-chain keepsakes, in your DMs."
 
 Optional but adds polish:
 - Mention `Base Sepolia` (judges in crypto-AI space will notice)
@@ -48,7 +48,7 @@ Two options — pick one or remix:
 
 ### Short
 ```
-🔮 Hermes Oracle — a tarot/astrology divination skill for Hermes Agent.
+🔮 Mnemos — a tarot/astrology divination skill for Hermes Agent.
 Pulls 3-card spreads rendered as a unified FLUX deck, interprets via Kimi K2.6
 with 256K-context memory of every prior reading, and mints the hero card on
 Base Sepolia. Live bot: @hermeskimi_oracle_bot.
@@ -59,7 +59,7 @@ GitHub: https://github.com/dream0x/Hermes-Tarot
 
 ### Long (for the writeup track judges)
 ```
-🔮 Hermes Oracle
+🔮 Mnemos
 
 Built a Hermes Agent skill that turns the agent into a personal divination
 companion. It pulls tarot spreads, renders the cards via FLUX in a single
