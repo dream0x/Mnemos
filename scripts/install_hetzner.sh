@@ -47,9 +47,11 @@ fi
 say "4/6  clone repo + create venv"
 if [ -d "$INSTALL_DIR/.git" ]; then
   warn "$INSTALL_DIR exists — pulling latest"
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
   sudo -u "$SERVICE_USER" git -C "$INSTALL_DIR" pull --ff-only
 else
   rm -rf "$INSTALL_DIR"
+  install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0755 "$INSTALL_DIR"
   sudo -u "$SERVICE_USER" git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
 fi
 chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
