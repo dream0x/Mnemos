@@ -11,6 +11,8 @@ A divination companion built as a [Hermes Agent](https://hermes-agent.nousresear
 
 Built for the [**Hermes Agent Creative Hackathon**](https://hermes-agent.nousresearch.com/) by [Nous Research](https://nousresearch.com/) × [Kimi (Moonshot AI)](https://www.kimi.com/), May 2026.
 
+> **Status (May 2026, post-hackathon):** Submission complete. Bot is still live, real readings keep happening, code stays open. If the live bot goes offline later, you can self-host with your own API keys in ~10 min (see Setup below).
+
 ---
 
 ## Why this exists
@@ -205,14 +207,28 @@ That's typically 5-20K input tokens, well under the 256K ceiling. The result: Mn
 ## Roadmap (post-hackathon v0.3)
 - Live **x402** paid premium readings (autonomous USDC microtransactions per spread)
 - Autonomous mint per reading (every spread auto-mints as a private NFT keepsake)
-- Discord & WhatsApp deployments (Hermes makes this ~30 min of config)
-- Voice replies via TTS for blind users
-- Mobile-friendly Telegram WebApp for richer card flips
+- Run on a real **Hermes Agent runtime** (current production is `bot.py` calling `oracle.py` directly; the SKILL.md surface is ready, just needs the agent installed alongside)
+- Discord & WhatsApp deployments
+- Voice replies via TTS
 - More spreads (Celtic Cross, Year-Ahead, Career Cross)
 - Astrology natal chart rendering (skyfield is already in deps)
+- Persistent JobQueue (currently in-memory, daily horoscopes are lost on restart)
 - Optional opt-in "predictions tracked" - Mnemos revisits old readings and asks if they came true
 
 ---
 
+## What I learned building this
+
+A few things that surprised me and might help anyone else building on top:
+
+- **Kimi K2.6's 256K context is *the* product mechanic, not a footnote.** Once you put 30 prior readings into every prompt, the model naturally weaves callbacks ("the Magician walked behind you last week — that cycle is closing"). No retrieval, no embeddings, no vector DB. Just full conversation history. A wrapper-style "tarot bot" would never get this texture.
+- **FLUX [dev] still hallucinates titles on cards.** Even with strong negative prompts. The fix is `Pillow` overlaying the real card name in EB Garamond on top of the bottom band — clean, fast, free. Style locking happens through a single shared `DECK_STYLE` prompt + per-card art fragment.
+- **OpenSea retired all testnets** in 2025, so for a hackathon NFT mint you now need a custom viewer. The `docs/index.html` is one HTML file that reads the contract via Base Sepolia RPC and pulls metadata from IPFS — works in any browser, no backend.
+- **Telegram's `ReplyKeyboardMarkup` beats `InlineKeyboard` for primary navigation.** Persistent buttons at the bottom are way more discoverable than slash commands or inline-only flows.
+- **`fcntl.flock` for state files matters even at 10 users.** With `asyncio.to_thread` plus concurrent readings, two parallel updates to `quota.json` or `readings.jsonl` can lose data. Cheap fix, big robustness win.
+- **Don't trust a price constant you derived once.** Mid-hackathon code audit found that the Kimi cost tracker was off by 1000× — the `$5/day` ceiling would only have triggered at $5000 of real spend. Lesson: write a sanity unit test that asserts "one typical reading costs ~$X".
+
+---
+
 ## License
-MIT - see `LICENSE`. The live public bot may be offline after hackathon judging concludes; this code is reference and reproducible by anyone with their own API keys.
+MIT - see `LICENSE`. If the live public bot ever goes offline, this repo is fully reproducible — clone, copy `.env.example` to `.env`, fill your own API keys, and run.
